@@ -4,7 +4,7 @@
 #include <random>
 
 // define global
-int const rows = 10;
+int const rows = 100;
 int const columns = 100;
 
 struct neuron_constants
