@@ -1,2 +1,2 @@
 # nncore
-Just another digital neural net
+Just another digital neural network simulator

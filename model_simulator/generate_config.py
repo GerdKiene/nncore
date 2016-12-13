@@ -8,7 +8,7 @@ columns = 10
 for i in range(rows):
     for j in range(columns):
         if (i != j):
-            weigth_config_file.write("0.1 ")
+            weigth_config_file.write("1.1 ")
         if (i == j):
             weigth_config_file.write("0     ")
         if (j == columns - 1):

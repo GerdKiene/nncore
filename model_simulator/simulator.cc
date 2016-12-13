@@ -7,23 +7,33 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <typeinfo>
 
 // define global
 int const rows = 10;
 int const columns = 10;
 
+// saving the constants for individual neurons
 template <typename T>
 struct neuron_constants
 {
     T i_syn_0;
+    double i_syn_0_hidden;
     T e_l;
+    double e_l_hidden;
     T tau_l;
+    double tau_l_hidden;
     T tau_syn;
+    double tau_syn_hidden;
     T threshold;
+    double threshold_hidden;
     T reset_potential;
+    double reset_potential_hidden;
     T refrac_period;
+    double refrac_period_hidden;
 };
 
+// state of an individual neuron, including the setup
 template <typename T>
 struct neuron_state_var
 {
@@ -35,6 +45,7 @@ struct neuron_state_var
     neuron_constants<T> constants;
 };
 
+// saves a neural net: a collection of neurons and thier connections
 template <typename T>
 struct neural_net
 {
@@ -43,6 +54,7 @@ struct neural_net
 };
 
 
+// class for simulating a neural net
 template <class T>
 class Neural_net_c
 {
@@ -70,9 +82,11 @@ class Neural_net_c
     void set_initial_conditions();
     void print_config();
     void init_simulator();
+    void rescale_constants_for_type();
 };
 
 
+// read in config from weigth_config.data and neuron_config.data
 template <class T>
 void Neural_net_c<T>::read_in_config()
 {
@@ -81,15 +95,19 @@ void Neural_net_c<T>::read_in_config()
     std::string word;
     int i = 0;
     int j = 0;
+    double double_type;
     while (getline(fr, line))
     {
         std::istringstream iss(line);
-        i++;
         while(iss >> word)
         {
+            // if not double: round the value
+            // to get the best integer representation of the weigths
+            this->nn.weigths[i][j] = typeid(T).name() == typeid(double_type).name() ?  std::stod(word) : std::round(std::stod(word));
             j++;
-            this->nn.weigths[i][j] = (T)std::round(std::stod(word));
         }
+        i++;
+        j = 0;
     }
     fr.close();
 
@@ -100,19 +118,19 @@ void Neural_net_c<T>::read_in_config()
     for (int j_column = 0; j_column<columns; j_column++)
     {
         fr_config >> value;
-        this->nn.neurons[j_column].constants.e_l = (T)std::round(value);
+        this->nn.neurons[j_column].constants.e_l_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.i_syn_0 = (T)std::round(value);
+        this->nn.neurons[j_column].constants.i_syn_0_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.tau_l = (T)std::round(value);
+        this->nn.neurons[j_column].constants.tau_l_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.tau_syn = (T)std::round(value);
+        this->nn.neurons[j_column].constants.tau_syn_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.reset_potential = (T)std::round(value);
+        this->nn.neurons[j_column].constants.reset_potential_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.threshold = (T)std::round(value);
+        this->nn.neurons[j_column].constants.threshold_hidden = value;
         fr_config >> value;
-        this->nn.neurons[j_column].constants.refrac_period = (T)std::round(value);
+        this->nn.neurons[j_column].constants.refrac_period_hidden = value;
     }
     fr_config.close();
 }
@@ -341,12 +359,38 @@ void Neural_net_c<T>::init_simulator()
     init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 1500.0 * this->d_t);
 }
 
+template <class T>
+void Neural_net_c<T>::rescale_constants_for_type()
+{
+    double double_type;
+    if(typeid(T).name() == typeid(double_type).name() ? 1 : 0)
+    {
+        printf("double\n");
+        for (int j_column = 0; j_column<columns; j_column++)
+        {
+            this->nn.neurons[j_column].constants.e_l = this->nn.neurons[j_column].constants.e_l_hidden;
+            this->nn.neurons[j_column].constants.i_syn_0 = this->nn.neurons[j_column].constants.i_syn_0_hidden;
+            this->nn.neurons[j_column].constants.tau_l = this->nn.neurons[j_column].constants.tau_l_hidden;
+            this->nn.neurons[j_column].constants.tau_syn = this->nn.neurons[j_column].constants.tau_syn_hidden;
+            this->nn.neurons[j_column].constants.reset_potential = this->nn.neurons[j_column].constants.reset_potential_hidden;
+            this->nn.neurons[j_column].constants.threshold = this->nn.neurons[j_column].constants.threshold_hidden;
+        }
+    }
+    else
+    {
+        printf("not double\n");
+        // enter the translation to int here
+    }
+
+}
+
 int main()
 {
-    Neural_net_c<int> nn;
+    Neural_net_c<double> nn;
     nn.init_simulator();
     nn.set_initial_conditions();
     nn.read_in_config();
+    nn.rescale_constants_for_type();
     
     nn.print_config();
 
