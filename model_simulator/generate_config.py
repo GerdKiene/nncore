@@ -2,8 +2,8 @@ import numpy as np
 
 weigth_config_file = open("weigth_config.data", "w")
 
-rows = 10
-columns = 10
+rows = 100
+columns = 100
 
 for i in range(rows):
     for j in range(columns):
@@ -17,7 +17,7 @@ for i in range(rows):
 
 neuron_config_file = open("neuron_config.data", "w")
 
-constants = {"e_l": 0.0, "i_syn_0": 4000.0, "tau_l": 0.1, "tau_syn": 0.1,\
+constants = {"e_l": 0.0, "i_syn_0": 400.0, "tau_l": 0.1, "tau_syn": 2.0,\
         "reset_potential": 0.1, "threshold": 1.2, "refrac_period": 1.0}
 
 for i in range(columns):

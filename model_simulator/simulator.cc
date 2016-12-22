@@ -10,8 +10,8 @@
 #include <typeinfo>
 
 // define global
-int const rows = 1;
-int const columns = 1;
+int const rows = 100;
+int const columns = 100;
 
 // saving the constants for individual neurons
 template <typename T>
@@ -160,10 +160,10 @@ template <class T>
 T Neural_net_c<T>::synaptic_input_right_side(T current, T weigthsum, int n_i, int *spiketimes, int step)
 {
     // the 1/tau_syn is problematic for int -> solution: multiply and rescale equations - leading to transformed equations
-    std::cout << weigthsum << "\n";
-    std::cout << -1 * current / this->nn.neurons[n_i].constants.tau_syn
-        + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
-        + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum << "\n";
+    //std::cout << weigthsum << "\n";
+    //std::cout << -1 * current / this->nn.neurons[n_i].constants.tau_syn
+    //    + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
+    //    + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum << "\n";
     return -1 * current / this->nn.neurons[n_i].constants.tau_syn
         + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
         + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum;
@@ -238,7 +238,7 @@ neuron_state_var<T> Neural_net_c<T>::runge_kutta_step(T weigthsum, int n_i, int 
         this->nn.neurons[n_i].voltage = this->nn.neurons[n_i].constants.reset_potential;
         this->nn.neurons[n_i].fired = 1;
         this->nn.neurons[n_i].refrac = 1;
-        printf("set refrac \n");
+        //printf("set refrac \n");
         this->nn.neurons[n_i].refrac_count = 0;
     }
     else
@@ -273,8 +273,6 @@ void Neural_net_c<T>::init_rdm_spike_train(int num_sim_steps, int *spiketimes, d
     for(int i=0; i<num_sim_steps; i++)
     {
         spiketimes[i] = rand_val_0_1(p);
-        if(spiketimes[i] == 1)
-            printf("spike \n");
     }
 }
 
@@ -287,17 +285,16 @@ void Neural_net_c<T>::evolve_net()
 
     T weigthsum;
     
-    printf("refrac_count: %d \n", this->nn.neurons[0].refrac);
-
     for (int i=0; i<this->num_sim_steps; i++)
     {
         for (int j=0; j < columns; j++){
             weigthsum = sum_weigths_in_timestep(j);
             this->nn.neurons[j] = runge_kutta_step(weigthsum, j, this->spiketimes, this->step, this->d_t);
-            fp << this->nn.neurons[j].voltage << " ";
-            fp << this->nn.neurons[j].syn_current << " ";
-            fp << this->nn.neurons[j].fired << " ";
         }
+        // for now: save only the currently active neurons, leave the rest unsaved
+        fp << this->nn.neurons[0].voltage << " ";
+        fp << this->nn.neurons[0].syn_current << " ";
+        fp << this->nn.neurons[0].fired << " ";
         this->t += this->d_t;
         this->step += 1;
         fp << this->t << "\n";
@@ -345,7 +342,6 @@ void Neural_net_c<T>::set_initial_conditions()
         this->nn.neurons[i].refrac = 0;
         this->nn.neurons[i].refrac_count = 0;
         printf("initial condition set \n");
-        printf("refrac_count: %d \n", this->nn.neurons[i].refrac_count);
     }
 }
 
@@ -392,7 +388,7 @@ void Neural_net_c<T>::init_simulator()
         this->d_t = 1;
         this->t = 0;
     }
-    init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 0.0001);
+    init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 0.01);
 }
 
 template <class T>
@@ -419,10 +415,10 @@ void Neural_net_c<T>::rescale_constants_for_type()
     {
         printf("not double\n");
         // enter the translation to int here
+        double v_scaler = 1e9;
+        double curr_scaler = 1e3;
         for (int j_column = 0; j_column<columns; j_column++)
         {
-            double v_scaler = 1e6;
-            double curr_scaler = 1e3;
             this->nn.neurons[j_column].constants.e_l = std::round(v_scaler * this->nn.neurons[j_column].constants.e_l_hidden);
             this->nn.neurons[j_column].constants.i_syn_0 = std::round(1e3 * this->nn.neurons[j_column].constants.i_syn_0_hidden);
             this->nn.neurons[j_column].constants.tau_l = std::round(curr_scaler * this->nn.neurons[j_column].constants.tau_l_hidden);
