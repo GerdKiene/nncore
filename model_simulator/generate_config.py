@@ -2,8 +2,8 @@ import numpy as np
 
 weigth_config_file = open("weigth_config.data", "w")
 
-rows = 100
-columns = 100
+rows = 10
+columns = 10
 
 for i in range(rows):
     for j in range(columns):

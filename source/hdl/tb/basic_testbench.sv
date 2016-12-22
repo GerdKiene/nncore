@@ -22,6 +22,15 @@ always begin
     #(timestep / 2.0);
 end
 
-// instantiate the neurons and thier connections
+// instantiate the neurons and their connections
+
+/* 
+- read in config from txt file
+- programm config registers
+- initialize via reset
+- run benchmark and put out same membrane traces
+- implement priority encoder
+- implement basic routing
+*/
 
 endmodule

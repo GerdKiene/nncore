@@ -10,8 +10,8 @@
 #include <typeinfo>
 
 // define global
-int const rows = 100;
-int const columns = 100;
+int const rows = 10;
+int const columns = 10;
 
 // saving the constants for individual neurons
 template <typename T>
@@ -341,7 +341,7 @@ void Neural_net_c<T>::set_initial_conditions()
         this->nn.neurons[i].syn_current = 0.0;
         this->nn.neurons[i].refrac = 0;
         this->nn.neurons[i].refrac_count = 0;
-        printf("initial condition set \n");
+        //printf("initial condition set \n");
     }
 }
 
@@ -438,7 +438,7 @@ int main()
     nn.init_simulator();
     nn.set_initial_conditions();
     nn.read_in_config();
-    nn.set_initial_conditions();
+    nn.set_initial_conditions(); // needs to be done after read_in_config
     nn.rescale_constants_for_type();
 
     nn.print_config();
