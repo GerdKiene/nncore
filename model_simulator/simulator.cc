@@ -10,8 +10,8 @@
 #include <typeinfo>
 
 // define global
-int const rows = 10;
-int const columns = 10;
+int const rows = 1;
+int const columns = 1;
 
 // saving the constants for individual neurons
 template <typename T>
@@ -23,8 +23,10 @@ struct neuron_constants
     double e_l_hidden;
     T tau_l;
     double tau_l_hidden;
+    T one_over_tau_l;
     T tau_syn;
     double tau_syn_hidden;
+    T one_over_tau_syn;
     T threshold;
     double threshold_hidden;
     T reset_potential;
@@ -58,7 +60,6 @@ struct neural_net
 template <class T>
 class Neural_net_c
 {
-    neural_net<T> nn;
     T t;
     T d_t;
     int num_sim_steps;
@@ -67,6 +68,7 @@ class Neural_net_c
 
 
     public:
+    neural_net<T> nn;
     void read_in_config();
     T external_current(int);
     T synaptic_input_right_side(T, T, int, int*, int);
@@ -74,8 +76,8 @@ class Neural_net_c
     neuron_state_var<T> explicit_euler_step(T, int, int*, int, T);
     neuron_state_var<T> runge_kutta_step(T, int, int*, int, T);
     T sum_weigths_in_timestep(int);
-    int rand_val_0_1(T p);
-    void init_rdm_spike_train(int, int*, T);
+    int rand_val_0_1(double p);
+    void init_rdm_spike_train(int, int*, double);
     void evolve_net();
     void neuron_config_hom_setup();
     void weifgth_config_non_self_all_all();
@@ -87,6 +89,7 @@ class Neural_net_c
 
 
 // read in config from weigth_config.data and neuron_config.data
+// this seems to destroy the saved state, the neuron needs to be initalized afterwards
 template <class T>
 void Neural_net_c<T>::read_in_config()
 {
@@ -156,15 +159,26 @@ T Neural_net_c<T>::external_current(int step)
 template <class T> 
 T Neural_net_c<T>::synaptic_input_right_side(T current, T weigthsum, int n_i, int *spiketimes, int step)
 {
-    return -1.0/this->nn.neurons[n_i].constants.tau_syn * current+ this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum;
+    // the 1/tau_syn is problematic for int -> solution: multiply and rescale equations - leading to transformed equations
+    std::cout << weigthsum << "\n";
+    std::cout << -1 * current / this->nn.neurons[n_i].constants.tau_syn
+        + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
+        + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum << "\n";
+    return -1 * current / this->nn.neurons[n_i].constants.tau_syn
+        + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
+        + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum;
 }
 
 template <class T>
 T Neural_net_c<T>::lif_right_side(T voltage, int n_i, int step)
 {
-    return 1.0/this->nn.neurons[n_i].constants.tau_l * (this->nn.neurons[n_i].constants.e_l - voltage) + external_current(step) + this->nn.neurons[n_i].syn_current;
+    // the 1/tau_l is problematic for int
+    return (this->nn.neurons[n_i].constants.e_l - voltage) / this->nn.neurons[n_i].constants.tau_l
+        + external_current(step) 
+        + this->nn.neurons[n_i].syn_current;
 }
 
+/*
 template <class T>
 neuron_state_var<T> Neural_net_c<T>::explicit_euler_step(T weigthsum, int n_i, int *spiketimes, int step, T d_t)
 {
@@ -193,6 +207,7 @@ neuron_state_var<T> Neural_net_c<T>::explicit_euler_step(T weigthsum, int n_i, i
         this->nn.neurons[n_i].fired = 0;
     return this->nn.neurons[n_i];
 }
+*/
 
 
 template <class T>
@@ -214,6 +229,8 @@ neuron_state_var<T> Neural_net_c<T>::runge_kutta_step(T weigthsum, int n_i, int 
         this->nn.neurons[n_i].refrac_count += 1;
         if (this->nn.neurons[n_i].refrac_count > this->nn.neurons[n_i].constants.refrac_period / d_t)
             this->nn.neurons[n_i].refrac = 0;
+        //printf("neuron is refrac \n");
+        //printf("refrac_count: %d \n", this->nn.neurons[n_i].refrac_count);
     }
 
     if (this->nn.neurons[n_i].voltage > this->nn.neurons[n_i].constants.threshold)
@@ -221,6 +238,7 @@ neuron_state_var<T> Neural_net_c<T>::runge_kutta_step(T weigthsum, int n_i, int 
         this->nn.neurons[n_i].voltage = this->nn.neurons[n_i].constants.reset_potential;
         this->nn.neurons[n_i].fired = 1;
         this->nn.neurons[n_i].refrac = 1;
+        printf("set refrac \n");
         this->nn.neurons[n_i].refrac_count = 0;
     }
     else
@@ -243,18 +261,20 @@ T Neural_net_c<T>::sum_weigths_in_timestep(int neuron)
 }
 
 template <class T>
-int Neural_net_c<T>::rand_val_0_1(T p)
+int Neural_net_c<T>::rand_val_0_1(double p)
 {
     double rand_double = (double)rand() / RAND_MAX;
     return rand_double > (1 - p);
 }
 
 template <class T>
-void Neural_net_c<T>::init_rdm_spike_train(int num_sim_steps, int *spiketimes, T p)
+void Neural_net_c<T>::init_rdm_spike_train(int num_sim_steps, int *spiketimes, double p)
 {
     for(int i=0; i<num_sim_steps; i++)
     {
         spiketimes[i] = rand_val_0_1(p);
+        if(spiketimes[i] == 1)
+            printf("spike \n");
     }
 }
 
@@ -266,6 +286,9 @@ void Neural_net_c<T>::evolve_net()
     std::cout << this->num_sim_steps << "\n";
 
     T weigthsum;
+    
+    printf("refrac_count: %d \n", this->nn.neurons[0].refrac);
+
     for (int i=0; i<this->num_sim_steps; i++)
     {
         for (int j=0; j < columns; j++){
@@ -321,6 +344,8 @@ void Neural_net_c<T>::set_initial_conditions()
         this->nn.neurons[i].syn_current = 0.0;
         this->nn.neurons[i].refrac = 0;
         this->nn.neurons[i].refrac_count = 0;
+        printf("initial condition set \n");
+        printf("refrac_count: %d \n", this->nn.neurons[i].refrac_count);
     }
 }
 
@@ -352,11 +377,22 @@ void Neural_net_c<T>::print_config()
 template <class T>
 void Neural_net_c<T>::init_simulator()
 {
-    this->num_sim_steps = 200000;
-    this->step = 0;
-    this->d_t = 0.1e-3;
-    this->t = 0.0;
-    init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 1500.0 * this->d_t);
+    double double_type;
+    if(typeid(T).name() == typeid(double_type).name() ? 1 : 0)
+    {
+        this->num_sim_steps = 200000;
+        this->step = 0;
+        this->d_t = 0.1e-3;
+        this->t = 0.0;
+    }
+    else
+    {
+        this->num_sim_steps = 200000;
+        this->step = 0;
+        this->d_t = 1;
+        this->t = 0;
+    }
+    init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 0.0001);
 }
 
 template <class T>
@@ -371,27 +407,44 @@ void Neural_net_c<T>::rescale_constants_for_type()
             this->nn.neurons[j_column].constants.e_l = this->nn.neurons[j_column].constants.e_l_hidden;
             this->nn.neurons[j_column].constants.i_syn_0 = this->nn.neurons[j_column].constants.i_syn_0_hidden;
             this->nn.neurons[j_column].constants.tau_l = this->nn.neurons[j_column].constants.tau_l_hidden;
+            this->nn.neurons[j_column].constants.one_over_tau_l = 1.0 / this->nn.neurons[j_column].constants.tau_l_hidden;
             this->nn.neurons[j_column].constants.tau_syn = this->nn.neurons[j_column].constants.tau_syn_hidden;
+            this->nn.neurons[j_column].constants.one_over_tau_syn = 1.0 / this->nn.neurons[j_column].constants.tau_syn_hidden;
             this->nn.neurons[j_column].constants.reset_potential = this->nn.neurons[j_column].constants.reset_potential_hidden;
             this->nn.neurons[j_column].constants.threshold = this->nn.neurons[j_column].constants.threshold_hidden;
+            this->nn.neurons[j_column].constants.refrac_period = this->nn.neurons[j_column].constants.refrac_period_hidden;
         }
     }
     else
     {
         printf("not double\n");
         // enter the translation to int here
+        for (int j_column = 0; j_column<columns; j_column++)
+        {
+            double v_scaler = 1e6;
+            double curr_scaler = 1e3;
+            this->nn.neurons[j_column].constants.e_l = std::round(v_scaler * this->nn.neurons[j_column].constants.e_l_hidden);
+            this->nn.neurons[j_column].constants.i_syn_0 = std::round(1e3 * this->nn.neurons[j_column].constants.i_syn_0_hidden);
+            this->nn.neurons[j_column].constants.tau_l = std::round(curr_scaler * this->nn.neurons[j_column].constants.tau_l_hidden);
+            this->nn.neurons[j_column].constants.one_over_tau_l = std::round(curr_scaler / this->nn.neurons[j_column].constants.tau_l_hidden);
+            this->nn.neurons[j_column].constants.tau_syn = std::round(curr_scaler * this->nn.neurons[j_column].constants.tau_syn_hidden);
+            this->nn.neurons[j_column].constants.one_over_tau_syn = std::round(curr_scaler / this->nn.neurons[j_column].constants.tau_syn_hidden);
+            this->nn.neurons[j_column].constants.reset_potential = std::round(v_scaler * this->nn.neurons[j_column].constants.reset_potential_hidden);
+            this->nn.neurons[j_column].constants.threshold = std::round(v_scaler * this->nn.neurons[j_column].constants.threshold_hidden);
+            this->nn.neurons[j_column].constants.refrac_period = std::round(curr_scaler * this->nn.neurons[j_column].constants.refrac_period_hidden);
+        }
     }
-
 }
 
 int main()
 {
-    Neural_net_c<double> nn;
+    Neural_net_c<int> nn;
     nn.init_simulator();
     nn.set_initial_conditions();
     nn.read_in_config();
+    nn.set_initial_conditions();
     nn.rescale_constants_for_type();
-    
+
     nn.print_config();
 
     nn.evolve_net();
