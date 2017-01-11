@@ -65,6 +65,7 @@ class Neural_net_c
     int num_sim_steps;
     int step;
     int spiketimes[200000];
+    int gamma_scaler;
 
 
     public:
@@ -164,7 +165,7 @@ T Neural_net_c<T>::synaptic_input_right_side(T current, T weigthsum, int n_i, in
     //std::cout << -1 * current / this->nn.neurons[n_i].constants.tau_syn
     //    + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
     //    + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum << "\n";
-    return -1 * current / this->nn.neurons[n_i].constants.tau_syn
+    return -1 * current/pow(2, this->gamma_scaler) * this->nn.neurons[n_i].constants.one_over_tau_syn
         + this->nn.neurons[n_i].constants.i_syn_0 * spiketimes[step] 
         + this->nn.neurons[n_i].constants.i_syn_0 * weigthsum;
 }
@@ -173,7 +174,7 @@ template <class T>
 T Neural_net_c<T>::lif_right_side(T voltage, int n_i, int step)
 {
     // the 1/tau_l is problematic for int
-    return (this->nn.neurons[n_i].constants.e_l - voltage) / this->nn.neurons[n_i].constants.tau_l
+    return (this->nn.neurons[n_i].constants.e_l - voltage)/pow(2, this->gamma_scaler) * this->nn.neurons[n_i].constants.one_over_tau_l
         + external_current(step) 
         + this->nn.neurons[n_i].syn_current;
 }
@@ -364,6 +365,7 @@ void Neural_net_c<T>::print_config()
     std::cout << "e_l:            " << this->nn.neurons[0].constants.e_l << "\n";
     std::cout << "i_syn:          " << this->nn.neurons[0].constants.i_syn_0 << "\n";
     std::cout << "tau_l           " << this->nn.neurons[0].constants.tau_l << "\n";
+    std::cout << "one_over_tau_l  " << this->nn.neurons[0].constants.one_over_tau_l << "\n";
     std::cout << "tau_syn         " << this->nn.neurons[0].constants.tau_syn << "\n";
     std::cout << "reset_potential " << this->nn.neurons[0].constants.reset_potential << "\n";
     std::cout << "threshold:      " << this->nn.neurons[0].constants.threshold << "\n";
@@ -387,6 +389,7 @@ void Neural_net_c<T>::init_simulator()
         this->step = 0;
         this->d_t = 1;
         this->t = 0;
+        this->gamma_scaler = 13;
     }
     init_rdm_spike_train(this->num_sim_steps, this->spiketimes, 0.01);
 }
@@ -417,17 +420,18 @@ void Neural_net_c<T>::rescale_constants_for_type()
         // enter the translation to int here
         double v_scaler = 1e9;
         double curr_scaler = 1e3;
+        double time_scaler = 1e4;
         for (int j_column = 0; j_column<columns; j_column++)
         {
             this->nn.neurons[j_column].constants.e_l = std::round(v_scaler * this->nn.neurons[j_column].constants.e_l_hidden);
-            this->nn.neurons[j_column].constants.i_syn_0 = std::round(1e3 * this->nn.neurons[j_column].constants.i_syn_0_hidden);
-            this->nn.neurons[j_column].constants.tau_l = std::round(curr_scaler * this->nn.neurons[j_column].constants.tau_l_hidden);
-            this->nn.neurons[j_column].constants.one_over_tau_l = std::round(curr_scaler / this->nn.neurons[j_column].constants.tau_l_hidden);
-            this->nn.neurons[j_column].constants.tau_syn = std::round(curr_scaler * this->nn.neurons[j_column].constants.tau_syn_hidden);
-            this->nn.neurons[j_column].constants.one_over_tau_syn = std::round(curr_scaler / this->nn.neurons[j_column].constants.tau_syn_hidden);
+            this->nn.neurons[j_column].constants.i_syn_0 = std::round(1e1 * this->nn.neurons[j_column].constants.i_syn_0_hidden);
+            this->nn.neurons[j_column].constants.tau_l = std::round(time_scaler * this->nn.neurons[j_column].constants.tau_l_hidden);
+            this->nn.neurons[j_column].constants.one_over_tau_l = std::round(pow(2, this->gamma_scaler) / (time_scaler * this->nn.neurons[j_column].constants.tau_l_hidden));
+            this->nn.neurons[j_column].constants.tau_syn = std::round(time_scaler * this->nn.neurons[j_column].constants.tau_syn_hidden);
+            this->nn.neurons[j_column].constants.one_over_tau_syn = std::round(pow(2, this->gamma_scaler) / (time_scaler * this->nn.neurons[j_column].constants.tau_syn_hidden));
             this->nn.neurons[j_column].constants.reset_potential = std::round(v_scaler * this->nn.neurons[j_column].constants.reset_potential_hidden);
             this->nn.neurons[j_column].constants.threshold = std::round(v_scaler * this->nn.neurons[j_column].constants.threshold_hidden);
-            this->nn.neurons[j_column].constants.refrac_period = std::round(curr_scaler * this->nn.neurons[j_column].constants.refrac_period_hidden);
+            this->nn.neurons[j_column].constants.refrac_period = std::round(time_scaler * this->nn.neurons[j_column].constants.refrac_period_hidden);
         }
     }
 }
